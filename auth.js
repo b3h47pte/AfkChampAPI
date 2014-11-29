@@ -1,7 +1,7 @@
 // auth.js
 // Makes sure the given command can be executed with the given privilege.
 // Also make sure we are sure of who we are communicating with (client/backend).
-var pconfig = require('private_config');
+var pconfig = require('./private/privateConfig');
 var forge = require('node-forge');
 var auth = {}
 auth.GetAuthLevel = function(data) {
