@@ -7,7 +7,8 @@ app.use(cookieParser);
 app.use(bodyParser.json());
 
 var http = require('http').Server(app);
-var websocketApi= require('./apiWebsocket')(http);
+var database = require('./database');
+var websocketApi= require('./apiWebsocket')(http, database);
 
 http.listen(3000, function(){
   console.log('***API Frontend Started Listening on Port 3000***');
