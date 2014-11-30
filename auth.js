@@ -12,10 +12,19 @@ auth.GetAuthLevel = function(data) {
 };
 
 auth.AuthLevelEnum = Object.freeze({
-  CLIENT: 0,
-  BACKEND: 1,
-  ADMIN: 2
+  NONE: 0,
+  CLIENT: 1,
+  BACKEND: 2,
+  ADMIN: 3
 });
+
+
+auth.ServerSignMessageHex = function(message, key) {
+  var hmac = forge.hmac.create();
+  hmac.start('sha256', key);
+  hmac.update(message);
+  return hmac.digest().toHex();
+};
 
 module.exports = auth;
 
@@ -25,9 +34,9 @@ function checkAuthBackendMessage(data) {
   }
 
   var hmac = forge.hmac.create();
-  hmac.start('sha256', pconfig.backendPrivateKey);
-  hmac.update(data.message);
-  return (hmac.digest().toHex() == data.signature);
+  var checkSignature = auth.ServerSignMessageHex(data.message,
+                                                 pconfig.backendPrivateKey);
+  return (checkSignature == data.signature);
 }
 
 module.exports = auth;
