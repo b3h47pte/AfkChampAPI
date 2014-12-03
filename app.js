@@ -10,6 +10,21 @@ var http = require('http').Server(app);
 var database = require('./database');
 var websocketApi= require('./apiWebsocket')(http, database);
 
+app.get("/test", function(req, res) {
+  database.connectionPool.getConnection(function(err, connection) {
+    if(err) throw err;
+
+    connection.query('SELECT * FROM events', function (err, rows) {
+      connection.release();
+
+      
+
+    });
+    
+
+  });
+});
+
 http.listen(3000, function(){
   console.log('***API Frontend Started Listening on Port 3000***');
 });
