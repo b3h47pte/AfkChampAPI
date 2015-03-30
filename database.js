@@ -12,7 +12,7 @@ db.connectionPool = mysql.createPool({
   database: pconfig.db.database
 });
 
-// StoreLiveUpdate is called whenever the Websocket API receives an update from the
+// StoreLiveUpdate is called whenever the API server receives an update from the
 // server about any of the tracked games.
 db.StoreLiveUpdate = function(match, data) {
   db.connectionPool.getConnection(function(err, connection) {

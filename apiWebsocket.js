@@ -1,8 +1,8 @@
 // apiWebsocket.js
 // Handles the Websocket API (mainly used as the method of providing live stats).
 var auth = require('./auth');
-var websocket = function(http, db) {
-  var io = require('socket.io')(http);
+var websocket = function(app, http, db) {
+  this.io = require('socket.io')(http);
 
   function HandleLiveStatsSocket(socket) {
     var authLevel = auth.AuthLevelEnum.NONE;
@@ -21,29 +21,47 @@ var websocket = function(http, db) {
       }
     });
 
-    // Update live stats for a particular match. Can only be done by the 
-    // backend/admin.
-    socket.on('serverUpdate', function(data) {
-      if (authLevel < auth.AuthLevelEnum.BACKEND) {
-        return;
-      }
-
-      // Store data in the database
-      db.StoreLiveUpdate(data.match, data.content);    
-    
-      // Make sure data is signed as being from the API server.
-      data.signature = auth.ServerSignMessageHex(data.message, pconfig.apiPrivateKey);
-      socket.broadcast.to(data.match).emit('clientUpdate', data);
-    });
-
     // Once we disconnect, make sure this socket can't be used anymore.
     socket.on('disconnect', function() {
       authLevel = auth.AuthLevelEnum.NONE;
     });
   }
 
-  io.on('connection', HandleLiveStatsSocket);
+  this.io.on('connection', HandleLiveStatsSocket);
 };
 
+websocket.prototype.CreateNamespace = function(eventId) {
+ return eventId;
+}
 
-module.exports = websocket
+websocket.prototype.HandleIncomingLiveStatsData = function(data) {
+  // First need to make sure the data has maintained its INTEGRITY and then make sure the data comes from an AUTHENTICATED source
+  var receivedSignature = data.signature;
+  delete data["signature"];
+  
+  var receiveData = {
+    "message": JSON.stringify(data),
+    "signature": receivedSignature
+  };
+  
+  if (!auth.checkAuthBackendMessage(receiveData)) {
+    console.log("Invalid Message (Auth): " + JSON.stringify(data));
+    return;
+  }
+  
+  if (!data.eventId) {
+    console.log("Invalid Message (Event ID): " + JSON.stringify(data));
+    return;
+  }
+  
+  var socketNamespace = this.CreateNamespace(data.eventId);
+  
+  var sendData = data;  
+  // Recreate signature such that it's from the API server now.
+  sendData.signature = auth.ServerSignMessageHex(JSON.stringify(sendData));
+  
+  this.io.of(socketNamespace).emit('update', sendData);
+}
+
+
+module.exports = websocket;

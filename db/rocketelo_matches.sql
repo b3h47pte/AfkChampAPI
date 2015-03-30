@@ -26,15 +26,12 @@ DROP TABLE IF EXISTS `matches`;
 /*!40101 SET character_set_client = utf8 */;
 CREATE TABLE `matches` (
   `matchid` bigint(20) unsigned NOT NULL AUTO_INCREMENT,
-  `parenteventid` bigint(20) unsigned DEFAULT NULL,
+  `parentseriesid` bigint(20) unsigned DEFAULT NULL,
   `matchtime` datetime DEFAULT NULL,
   `isgamefinished` tinyint(1) unsigned zerofill DEFAULT NULL,
-  `gameid` int(10) unsigned NOT NULL,
   UNIQUE KEY `matchid_UNIQUE` (`matchid`),
-  KEY `matches_parenteventid_idx` (`parenteventid`),
-  KEY `matches_gameid_idx` (`gameid`),
-  CONSTRAINT `matches_gameid` FOREIGN KEY (`gameid`) REFERENCES `games` (`gameid`) ON DELETE CASCADE ON UPDATE CASCADE,
-  CONSTRAINT `matches_parenteventid` FOREIGN KEY (`parenteventid`) REFERENCES `events` (`eventid`) ON DELETE SET NULL ON UPDATE CASCADE
+  KEY `matches_parenteventid_idx` (`parentseriesid`),
+  CONSTRAINT `matches_parentseriesid` FOREIGN KEY (`parentseriesid`) REFERENCES `series` (`seriesid`) ON DELETE CASCADE ON UPDATE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8;
 /*!40101 SET character_set_client = @saved_cs_client */;
 /*!40103 SET TIME_ZONE=@OLD_TIME_ZONE */;
@@ -47,4 +44,4 @@ CREATE TABLE `matches` (
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
 /*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
 
--- Dump completed on 2014-12-09  1:13:12
+-- Dump completed on 2014-12-10  0:25:13

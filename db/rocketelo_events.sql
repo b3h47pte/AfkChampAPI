@@ -32,11 +32,14 @@ CREATE TABLE `events` (
   `eventshorthand` varchar(20) NOT NULL,
   `parenteventid` bigint(20) unsigned DEFAULT '0',
   `isparentevent` tinyint(1) unsigned zerofill DEFAULT '0',
+  `gameid` int(10) unsigned DEFAULT NULL,
   PRIMARY KEY (`eventid`,`ownerid`,`eventshorthand`),
   UNIQUE KEY `eventid_UNIQUE` (`eventid`),
   UNIQUE KEY `eventshorthand_UNIQUE` (`eventshorthand`),
   KEY `ownerid_idx` (`ownerid`),
   KEY `events_parenteventid_idx` (`parenteventid`),
+  KEY `events_gameid_idx` (`gameid`),
+  CONSTRAINT `events_gameid` FOREIGN KEY (`gameid`) REFERENCES `games` (`gameid`) ON UPDATE CASCADE,
   CONSTRAINT `events_ownerid` FOREIGN KEY (`ownerid`) REFERENCES `users` (`userid`) ON UPDATE CASCADE,
   CONSTRAINT `events_parenteventid` FOREIGN KEY (`parenteventid`) REFERENCES `events` (`eventid`) ON UPDATE CASCADE
 ) ENGINE=InnoDB AUTO_INCREMENT=7 DEFAULT CHARSET=utf8;
@@ -51,4 +54,4 @@ CREATE TABLE `events` (
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
 /*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
 
--- Dump completed on 2014-12-09  1:13:13
+-- Dump completed on 2014-12-10  0:25:13
