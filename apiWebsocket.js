@@ -3,6 +3,7 @@
 var auth = require('./auth');
 var websocket = function(app, http, db) {
   this.io = require('socket.io')(http);
+  this.db = db;
 
   function HandleLiveStatsSocket(socket) {
     var authLevel = auth.AuthLevelEnum.NONE;
@@ -30,8 +31,8 @@ var websocket = function(app, http, db) {
   this.io.on('connection', HandleLiveStatsSocket);
 };
 
-websocket.prototype.CreateNamespace = function(eventId) {
- return eventId;
+websocket.prototype.CreateNamespace = function(matchId) {
+ return matchId;
 }
 
 websocket.prototype.HandleIncomingLiveStatsData = function(data) {
@@ -49,17 +50,21 @@ websocket.prototype.HandleIncomingLiveStatsData = function(data) {
     return;
   }
   
-  if (!data.eventId) {
-    console.log("Invalid Message (Event ID): " + JSON.stringify(data));
+  if (!data.matchId) {
+    console.log("Invalid Message (Match ID): " + JSON.stringify(data));
     return;
   }
   
-  var socketNamespace = this.CreateNamespace(data.eventId);
+  var socketNamespace = this.CreateNamespace(data.matchId);
   
   var sendData = data;  
   // Recreate signature such that it's from the API server now.
   sendData.signature = auth.ServerSignMessageHex(JSON.stringify(sendData));
   
+  // Store in DB
+  this.db.StoreLiveUpdate(data.matchId, sendData);
+  
+  // Transmit to Websockets
   this.io.of(socketNamespace).emit('update', sendData);
 }
 
