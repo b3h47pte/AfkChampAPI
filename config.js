@@ -4,5 +4,7 @@ var config = {}
 
 config.production = false;
 
+config.leagueGameId = 1;
+
 module.exports = config;
 
