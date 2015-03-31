@@ -1,0 +1,62 @@
+LEAGUE LIVE UPDATE FORMAT v0.1 (JSON)
+- 1) All times are in seconds unless otherwise noted
+- 2) Note that the live stats analysis program is blind to who the team is/who the player is. That information should be filled in elsewhere.
+
+Live Update Data Type:
+{
+  "type": (int),
+  "teams": [t1, t2],
+  "events": [e1, ... , en],
+  "global": global,
+  "picks": [(string), ... , (string)],
+  "bans": [(string), ..., (string)]
+}
+
+- Type is either 0 or 1. 0 means it's a regular live update during the game. In this case "picks" and "bans" are empty.
+  1 indicates that it is a game state update -- usually restricted to picks/bans where players are getting setup. In this case all other sections besides "picks" and "bans" are empty.
+- Team Index: t1 is the blue team. t2 is the red team.
+
+Team Data Type (t*):
+{
+  "players": [p1, ..., p5],
+  "kills": (int),
+  "gold": (int),
+  "towers": (int),
+  "totalDragons": (int),
+  "currentDragons": (int),
+  "barons": (int),
+  "inhibs": (int)
+}
+
+- "players" are given in the order that they appear in the game.
+
+Player Data Type (p*):
+{
+  "kills": (int),
+  "deaths": (int),
+  "assists": (int),
+  "creeps": (int),
+  "towers": (int),
+  "inhibs": (int),
+  "barons": (int),
+  "dragons": (int)
+}
+
+Event Data Type (e*):
+{
+  "team": (int),
+  "mainPlayer": (int),
+  "supportingPlayers:" [(int), ..., (int)],
+  "target": (int),
+  "killtype": (int)
+}
+
+- "team", "mainPlayer", "supportingPlayers", "targetSecondary" give the index of the team/player in the "teams" or the correct "players" array. ("targetSecondary" only when the "target" is for a champion)
+- "target" tells us what we actually destroyed (champ, tower, inhib, etc.)
+
+Global Data Type:
+{
+  "time": (int),
+  "timeToDragon": (int),
+  "timeToBaron": (int)
+}
