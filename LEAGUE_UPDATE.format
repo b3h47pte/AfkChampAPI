@@ -17,6 +17,7 @@ Live Update Data Type:
 
 Team Data Type (t*):
 {
+  "name": (string),
   "players": [p1, ..., p5],
   "kills": (int),
   "gold": (int),

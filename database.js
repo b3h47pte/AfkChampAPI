@@ -4,6 +4,7 @@ var db = {};
 var pconfig = require('./private/privateConfig');
 var config = require('./config.js');
 var mysql = require('mysql');
+var async = require("async");
 db.cache = require('./cache');
 
 db.connectionPool = mysql.createPool({
@@ -71,13 +72,27 @@ db.LaunchQuery = function(query, callback) {
   });
 }
 
+db.GetTeamIdsForMatch = function(match, data, cachedData, cb) {
+  // Find the teams assigned to this match and get their shortnames and match it up to the teams given in data.
+  var teamsQuery = "SELECT teams.teamid, teams.teamshorthand \
+    FROM rocketelo.match_team match_team \
+      INNER JOIN rocketelo.teams teams ON teams.teamid = match_team.teamid \
+    WHERE match_team.matchid = " + match;
+  db.LaunchQuery(teamsQuery, function(err, result) {
+    if (err) {
+      console.log("GET TEAM IDS ERROR: " + err);
+      return;
+    }
+    
+    cachedData.teamIds = [];
+  });
+}
+
+db.GetPlayerIdsForMatch = function(match, data, cachedData, cb) {
+  var playersQuery = "";
+}
+
 db.StoreLeagueLiveUpdate = function(match, data) {
-  var cachedData = db.cache.Access(match);
-  if (!cachedData) {
-    cachedData = {};
-    db.cache.Put(match, cachedData);
-  }
-  
   function StoreStatUpdate() {
   
   }
@@ -117,14 +132,39 @@ db.StoreLeagueLiveUpdate = function(match, data) {
     cachedData.playersetup.push(data.picks[1].slice(0));
   }
   
-  // See LEAGUE_UPDATE.format as to how 'data' will have its information stored.
-  if (data.mode == 0) {
-    if (!cachedData.savedSetup) {
-      StoreSetupUpdate();   
+  function HandleUpdate() {
+    // See LEAGUE_UPDATE.format as to how 'data' will have its information stored.
+    if (data.mode == 0) {
+      if (!cachedData.savedSetup) {
+        StoreSetupUpdate();   
+      }
+      StoreStatUpdate(); 
+    } else if (data.mode == 1) {
+      CacheSetupUpdate();
     }
-    StoreStatUpdate(); 
-  } else if (data.mode == 1) {
-    CacheSetupUpdate();
+  }
+
+  var cachedData = db.cache.Access(match);
+  if (!cachedData) {
+    var recache = db.cache.Lock(match);
+    if (!recache) {
+      setTimeout(function() {
+        db.StoreLeagueLiveUpdate(match, data);
+      }, 200);
+      return;
+    }
+    
+    cachedData = {};
+    
+    // Get Team ID's and Player ID's for the match
+    // This information is fixed for now -- but this should eventually be adaptable based on the live stats information (AKA GET PLAYER NAMES)
+    db.GetTeamIdsForMatch(match, data, cachedData, function() {
+      db.GetPlayerIdsForMatch(match, data, cachedData, function(){
+        db.cache.Put(match, cachedData);
+        db.cache.Unlock();
+        HandleUpdate();
+      });
+    });
   }
 }
 
