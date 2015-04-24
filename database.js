@@ -85,19 +85,71 @@ db.GetTeamIdsForMatch = function(match, data, cachedData, cb) {
     }
     
     cachedData.teamIds = [];
+    cachedData.teamNames = [];
+    
+    for(var r in result) {
+      cachedData.teamIds.push(r.teamid);
+      cachedData.teamNames.push(r.teamshorthand);
+    }
+    cb();
   });
 }
 
 db.GetPlayerIdsForMatch = function(match, data, cachedData, cb) {
-  var playersQuery = "";
+  var playersQuery = "SELECT players.playerid, players.playername \
+    FROM rocketelo.match_player match_player \
+      INNER JOIN rocketelo.players players ON players.playerid = match_player.playerid \
+    WHERE match_player.matchid = " + match;
+  db.LaunchQuery(playersQuery, function(err, result) {
+    if (err) {
+      console.log("GET PLAYER IDS ERROR: " + err);
+      return;
+    }
+    
+    cachedData.playerIds = [];
+    cachedData.playerNames = [];
+    for(var r in result) {
+      cachedData.playerIds.push(r.playerid);
+      cachedData.playerNames.push(r.playername);
+    }
+    cb();
+  });
 }
 
 db.StoreLeagueLiveUpdate = function(match, data) {
+  var cachedData = db.cache.Access(match);
+  if (!cachedData) {
+    var recache = db.cache.Lock(match);
+    if (!recache) {
+      setTimeout(function() {
+        db.StoreLeagueLiveUpdate(match, data);
+      }, 200);
+      return;
+    }
+    
+    cachedData = {};
+    
+    // Get Team ID's, Player ID's for the match
+    // This information is fixed for now -- but this should eventually be adaptable based on the live stats information (AKA GET PLAYER NAMES)
+    db.GetTeamIdsForMatch(match, data, cachedData, function() {
+      db.GetPlayerIdsForMatch(match, data, cachedData, function(){
+        db.cache.Put(match, cachedData);
+        db.cache.Unlock();
+        HandleUpdate();
+      });
+    });
+  } else {
+    HandleUpdate();
+  }
+  
   function StoreStatUpdate() {
   
   }
   
   function StoreSetupUpdate() {
+    if(!cachedData.savedSetup) {
+      return;
+    }
     cachedData.savedSetup = true;
     
     // Save team setups
@@ -136,35 +188,12 @@ db.StoreLeagueLiveUpdate = function(match, data) {
     // See LEAGUE_UPDATE.format as to how 'data' will have its information stored.
     if (data.mode == 0) {
       if (!cachedData.savedSetup) {
-        StoreSetupUpdate();   
+        StoreSetupUpdate();
       }
       StoreStatUpdate(); 
     } else if (data.mode == 1) {
       CacheSetupUpdate();
     }
-  }
-
-  var cachedData = db.cache.Access(match);
-  if (!cachedData) {
-    var recache = db.cache.Lock(match);
-    if (!recache) {
-      setTimeout(function() {
-        db.StoreLeagueLiveUpdate(match, data);
-      }, 200);
-      return;
-    }
-    
-    cachedData = {};
-    
-    // Get Team ID's and Player ID's for the match
-    // This information is fixed for now -- but this should eventually be adaptable based on the live stats information (AKA GET PLAYER NAMES)
-    db.GetTeamIdsForMatch(match, data, cachedData, function() {
-      db.GetPlayerIdsForMatch(match, data, cachedData, function(){
-        db.cache.Put(match, cachedData);
-        db.cache.Unlock();
-        HandleUpdate();
-      });
-    });
   }
 }
 

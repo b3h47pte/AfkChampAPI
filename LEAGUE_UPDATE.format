@@ -7,7 +7,7 @@ Live Update Data Type:
   "mode": (int),
   "teams": [t1, t2],
   "events": [e1, ... , en],
-  "global": global,
+  "global": (global),
   "picks":  [2][(string), ... , (string)],
   "bans": [2][(string), ..., (string)]
 }
