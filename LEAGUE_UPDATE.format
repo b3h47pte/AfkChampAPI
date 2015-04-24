@@ -47,12 +47,15 @@ Event Data Type (e*):
   "team": (int),
   "mainPlayer": (int),
   "supportingPlayers:" [(int), ..., (int)],
+  "type": (int),
   "target": (int),
+  "secondarytarget": (int),
   "killtype": (int)
 }
 
 - "team", "mainPlayer", "supportingPlayers", "targetSecondary" give the index of the team/player in the "teams" or the correct "players" array. ("targetSecondary" only when the "target" is for a champion)
-- "target" tells us what we actually destroyed (champ, tower, inhib, etc.)
+- "target" tells us what we destroyed (champ, tower, inhib, etc.)
+- "secondarytarget" then boils the "type" down to be more specific
 
 Global Data Type:
 {

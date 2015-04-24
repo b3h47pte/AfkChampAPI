@@ -96,23 +96,27 @@ db.GetTeamIdsForMatch = function(match, data, cachedData, cb) {
 }
 
 db.GetPlayerIdsForMatch = function(match, data, cachedData, cb) {
-  var playersQuery = "SELECT players.playerid, players.playername \
-    FROM rocketelo.match_player match_player \
-      INNER JOIN rocketelo.players players ON players.playerid = match_player.playerid \
-    WHERE match_player.matchid = " + match;
-  db.LaunchQuery(playersQuery, function(err, result) {
-    if (err) {
-      console.log("GET PLAYER IDS ERROR: " + err);
-      return;
-    }
-    
-    cachedData.playerIds = [];
-    cachedData.playerNames = [];
-    for(var r in result) {
-      cachedData.playerIds.push(r.playerid);
-      cachedData.playerNames.push(r.playername);
-    }
-    cb();
+  cachedData.playerIds = [];
+  cachedData.playerNames = [];
+  cachedData.teamIds.forEach(function(t, i) {
+    var playersQuery = "SELECT players.playerid, players.playername \
+      FROM rocketelo.match_player match_player \
+        INNER JOIN rocketelo.players players ON players.playerid = match_player.playerid \
+      WHERE match_player.matchid = " + match + " AND players.parentteamid = " + t.toString();
+    db.LaunchQuery(playersQuery, function(err, result) {
+      if (err) {
+        console.log("GET PLAYER IDS ERROR: " + err);
+        return;
+      }
+
+      cachedData.playerIds.push([]);
+      cachedData.playerNames.push([]);
+      for(var r in result) {
+        cachedData.playerIds[i].push(r.playerid);
+        cachedData.playerNames[i].push(r.playername);
+      }
+      cb();
+    });
   });
 }
 
@@ -143,7 +147,88 @@ db.StoreLeagueLiveUpdate = function(match, data) {
   }
   
   function StoreStatUpdate() {
-  
+    // Create new match stat row
+    var query = "INSERT INTO league_of_legends.match_stats (timestamp, parentmatchid, timetobaron, timetodragon) VALUES (?, ?, ?, ?)";
+    db.LaunchQuery(query, [data.global.time, parseInt(match), data.global.timeToDragon, data.global.timeToBaron], function(err, result) {
+      if (err) {
+        console.log("INSERT INTO MATCH STATS ERROR: " + err);
+        return;
+      }
+      var statId = result.insertId;
+      var tasks = [];
+      if (data.teams && data.teams.length > 0) {
+        data.teams.forEach(function(t, i){
+          tasks.push(function(callback) {
+            var query = "INSERT INTO league_of_legends.match_stats_team (parentmatchstatid, kills, gold, towers, totalDragons, currentDragons, barons, inhibitors, teamid) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)";
+            db.LaunchQuery(query, [statId, t.kills, t.gold, t.towers, t.totalDragons, t.currentDragons, t.barons, t.inhibitors, cachedData.teamIds[i]], function(err, result) {
+              callback(err, result);
+            });
+          });
+          
+          if (t.players && t.players.length > 0) {
+            t.players.forEach(function(p, j) {
+              tasks.push(function(callback) {
+                var query = "INSERT INTO league_of_legends.match_stats_player (parentmatchstatid, kills, deaths, assists, creeps, towers, inhibitors, barons, dragons, playerid) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+                db.LaunchQuery(query, [statId, p.kills, p.deaths, p.assists, p.creeps, p.towers, p.inhibs, p.barons, p.dragons, cachedData.playerIds[i][j]], function(err, result) {
+                  callback(err, result);
+                });
+              }); 
+            });
+          }  
+        });
+      }
+      
+      if (data.events && data.events.length > 0) {
+        data.events.forEach(function(e, i) {
+          tasks.push(function(callback) {
+            async.waterfall([
+              function(cb) {
+                var query = "INSERT INTO league_of_legends.match_event (eventtarget, eventtargetsecondary, relevantteam, killtype, timestamp, parentmatchid) VALUES (?, ?, ?, ?, ?, ?, ?)";
+                db.LaunchQuery(query, [e.target, e.secondarytarget, cachedData.teamIds[e.team], e.killtype, data.global.time, parseInt(match)], function(err, result) {
+                  cb(err, result);
+                }); 
+              },
+              // Main Player
+              function(inRes, cb) {
+                async.parallel([
+                  function(inRes, cb) {
+                    var query = "INSERT INTO league_of_legends.match_event_player (matcheventid, playerid, ismainplayer) VALUES (?, ?, ?)";
+                    db.LaunchQuery(query, [inRes.insertId, cachedData.playerIds[e.team][e.mainPlayer], 1], function(err, result) {
+                      cb(err, result);
+                    }); 
+                  },
+                  // Supporting Players
+                  function(inRes, cb) {
+                    var sp_tasks = [];
+                    e.supportingPlayers.forEach(function(sp, j) {
+                      sp_tasks.push(function(icb) {
+                        var query = "INSERT INTO league_of_legends.match_event_player (matcheventid, playerid, ismainplayer) VALUES (?, ?, ?)";
+                        db.LaunchQuery(query, [inRes.insertId, cachedData.playerIds[(e.team+1)%2][sp], 0], function(err, result) {
+                          icb(err, result);
+                        }); 
+                      });
+                    });
+                    async.parallel(sp_tasks, function(err, results) {
+                      cb(results);
+                    });
+                  }
+                ], function (err, results) {
+                  cb(err, results.concat([inRes]));
+                });
+              }
+            ], function(err, results) {
+              callback(err, results);
+            });
+          });  
+        });
+      }
+      
+      async.parallel(tasks, function(err, results) {
+        if (err) {
+          console.log("STORE STATE UPDATE ERROR: " + err); 
+        }
+      });
+    });
   }
   
   function StoreSetupUpdate() {
@@ -157,6 +242,9 @@ db.StoreLeagueLiveUpdate = function(match, data) {
       for (j = 0; j < 3; ++j) {
         var query = "INSERT INTO league_of_legends.match_team_setup (teamid, banned_champion, parentmatchid) VALUES (?, ?, ?)";
         db.LaunchQuery(query, [cachedData.teamIds[i], cachedData.teamsetup[i][j], parseInt(match)], function(err, result) {
+          if (err) {
+            console.log("SAVE TEAM SETUP ERROR: " + err);
+          }
         });
       }
     }
@@ -166,6 +254,9 @@ db.StoreLeagueLiveUpdate = function(match, data) {
       for (j = 0; j < 5; ++j) {
         var query = "INSERT INTO league_of_legends.match_player_setup (playerid, champion, parentmatchid) VALUES (?, ?, ?)";
         db.LaunchQuery(query, [cachedData.playerIds[i][j], cachedData.playersetup[i][j], parseInt(match)], function(err, result) {
+          if (err) {
+            console.log("SAVE PLAYER SETUP ERROR: " + err);
+          }
         });
       }
     }
