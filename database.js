@@ -5,6 +5,7 @@ var pconfig = require('./private/privateConfig');
 var config = require('./config.js');
 var mysql = require('mysql');
 var async = require("async");
+
 db.cache = require('./cache');
 
 db.connectionPool = mysql.createPool({
@@ -15,6 +16,19 @@ db.connectionPool = mysql.createPool({
   password: pconfig.db.password,
   database: pconfig.db.mainDatabase
 });
+
+db.GetMatchDataForLiveStatsQuery = function(matchId, callback) {
+  var matchQuery = "SELECT matches.matchid AS matchId, games.gameshorthand AS game, events.streamurl AS stream \
+        FROM rocketelo.matches matches \
+          INNER JOIN rocketelo.series series ON series.seriesid = matches.parentseriesid \
+          INNER JOIN rocketelo.events events ON events.eventid = series.parenteventid \
+          INNER JOIN rocketelo.games games ON games.gameid = events.gameid \
+        WHERE matches.matchid = ?";
+  db.LaunchQuery(matchQuery, [matchId.toString()], function(err, result) {
+    callback(result[0]);
+  });
+          
+}
 
 // StoreLiveUpdate is called whenever the API server receives an update from the
 // server about any of the tracked games.
@@ -59,13 +73,13 @@ db.StoreLiveUpdate = function(match, data) {
   });
 }
 
-db.LaunchQuery = function(query, callback) {
+db.LaunchQuery = function(query, params, callback) {
   db.connectionPool.getConnection(function(err, connection) {
     if (err) {
       console.log("LAUNCH QUERY ERROR: " + err + " :::: " + query);
       return;
     }
-    connection.query(query, function(err, results) {
+    connection.query(query, params, function(err, results) {
       connection.release();
       callback(err, results);
     });
@@ -78,7 +92,7 @@ db.GetTeamIdsForMatch = function(match, data, cachedData, cb) {
     FROM rocketelo.match_team match_team \
       INNER JOIN rocketelo.teams teams ON teams.teamid = match_team.teamid \
     WHERE match_team.matchid = " + match;
-  db.LaunchQuery(teamsQuery, function(err, result) {
+  db.LaunchQuery(teamsQuery, [], function(err, result) {
     if (err) {
       console.log("GET TEAM IDS ERROR: " + err);
       return;
@@ -103,7 +117,7 @@ db.GetPlayerIdsForMatch = function(match, data, cachedData, cb) {
       FROM rocketelo.match_player match_player \
         INNER JOIN rocketelo.players players ON players.playerid = match_player.playerid \
       WHERE match_player.matchid = " + match + " AND players.parentteamid = " + t.toString();
-    db.LaunchQuery(playersQuery, function(err, result) {
+    db.LaunchQuery(playersQuery, [], function(err, result) {
       if (err) {
         console.log("GET PLAYER IDS ERROR: " + err);
         return;

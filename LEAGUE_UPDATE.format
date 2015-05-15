@@ -13,7 +13,7 @@ Live Update Data Type:
 }
 - Team Index: t1 is the blue team. t2 is the red team.
 - picks and bans are both 2-dimensional arrays (the first index being 0/1 to pick the appropriate team) and then the next array being the actual picks and bans
-- mode: 0 - in-game, 1 - pick/ban, 2 - post-game, 3 - paused, 4 - replay
+- mode: 0 - in-game, 1 - pick/ban, 2 - post-game, 3 - paused, 4 - replay, 5 - pre-game
 
 Team Data Type (t*):
 {
@@ -25,7 +25,8 @@ Team Data Type (t*):
   "totalDragons": (int),
   "currentDragons": (int),
   "barons": (int),
-  "inhibs": (int)
+  "inhibs": (int),
+  "series": (int)
 }
 
 - "players" are given in the order that they appear in the game.
@@ -36,26 +37,33 @@ Player Data Type (p*):
   "deaths": (int),
   "assists": (int),
   "creeps": (int),
+  "level": (int),
   "towers": (int),
   "inhibs": (int),
   "barons": (int),
-  "dragons": (int)
+  "dragons": (int),
+  "isDead": (bool),
+  "isLowHealth": (bool),
+  "champion": (string),
+  "items": [(string), ... , (string)],
+  "name": (string)
 }
 
 Event Data Type (e*):
 {
   "team": (int),
-  "mainPlayer": (int),
-  "supportingPlayers:" [(int), ..., (int)],
   "type": (int),
-  "target": (int),
-  "secondarytarget": (int),
+  "info": (string)
+  "mainPlayer": (string),
+  "supportingPlayers": [(string), ..., (string))],
+  "timestamp": (int),
   "killtype": (int)
 }
 
-- "team", "mainPlayer", "supportingPlayers", "targetSecondary" give the index of the team/player in the "teams" or the correct "players" array. ("targetSecondary" only when the "target" is for a champion)
-- "target" tells us what we destroyed (champ, tower, inhib, etc.)
-- "secondarytarget" then boils the "type" down to be more specific
+- "team" gives the index of the team on which the mainPlayer and supportingPlayers are on
+- "mainPlayer" and "supportingPlayers" are champion name strings.
+- "type" is the type of event, turret kill, inhib kill, etc.
+- "info" is secondary information i.e. which turret got killed, which inhib, which champion.
 
 Global Data Type:
 {

@@ -20,7 +20,7 @@ cache.Lock = function(key) {
 cache.Unlock = function(key) {
   if (locks.hasOwnProperty(key)) {
      delete locks[key];
-  }
+  } 
 }
 
 cache.Put = function(key, value) {
