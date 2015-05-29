@@ -17,17 +17,63 @@ db.connectionPool = mysql.createPool({
   database: pconfig.db.mainDatabase
 });
 
-db.GetMatchDataForLiveStatsQuery = function(matchId, callback) {
-  var matchQuery = "SELECT matches.matchid AS matchId, games.gameshorthand AS game, events.streamurl AS stream \
+db.GetLeagueMatchId = function(eventId, data, callback) {
+  if(!data || !data.teams || !data.teams.length < 2) {
+    callback(null);
+    return;
+  }
+  
+  var team1 = data.teams[0].name;
+  var team2 = data.teams[1].name;
+  var matchQuery = "SELECT matches.matchid AS matchid, teams.teamshorthand AS team\
         FROM rocketelo.matches matches \
-          INNER JOIN rocketelo.series series ON series.seriesid = matches.parentseriesid \
-          INNER JOIN rocketelo.events events ON events.eventid = series.parenteventid \
-          INNER JOIN rocketelo.games games ON games.gameid = events.gameid \
-        WHERE matches.matchid = ?";
-  db.LaunchQuery(matchQuery, [matchId.toString()], function(err, result) {
-    callback(result[0]);
+          INNER JOIN rocketelo.match_team match_team ON matches.matchid = match_team.matchid \
+          INNER JOIN rocketelo.series series ON matches.parentseriesid = series.seriesid \
+          INNER JOIN rocketelo.events events ON series.parenteventid = events.eventid \
+          INNER JOIN rocketelo.games games ON events.gameid = games.gameid \
+          INNER JOIN rocketelo.teams teams ON match_team.teamid = teams.teamid \
+        WHERE events.eventid = ? AND games.gameshorthand = ?";
+  db.LaunchQuery(matchQuery, [eventId.toString(), config.leagueGameShortname], function(err, result) {
+    if (err) {
+      console.log("Get League Match Id Error: " + err);
+      callback(null);
+      return;
+    } 
+    
+    var foundTeams = true;
+    for (i = 0; i < 2; ++i) {
+      var found = false;
+      for (res in result) {
+        if (res.team == data.teams[i].name) {
+          found = true;
+          break;
+        }
+      }
+      foundTeams = foundTeams & found;
+    }
+    
+    if (!foundTeams) {
+      console.log("Get League Match Id Error: Could not find a match for these teams -- " + data.teams);
+      callback(null);
+      return;
+    }
+    
+    callback(result[0].matchid);
   });
-          
+}
+
+db.GenerateLiveStatsPathForStream = function(eventId, gameShortname, streamUrl, callback) {
+  var eventQuery = "SELECT events.eventid AS eventId, events.configpath AS config \
+        FROM rocketelo.events events \
+        WHERE events.eventid = ?";
+  db.LaunchQuery(eventQuery, [eventId.toString()], function(err, result) {
+    if (err) {
+      console.log("Generate Live Stats Path Error: " + err);
+      callback(null);
+    } else {
+      callback(result[0]);
+    }
+  });
 }
 
 // StoreLiveUpdate is called whenever the API server receives an update from the

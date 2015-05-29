@@ -5,31 +5,30 @@ var http = require('http');
 
 liveStatsManager.cache = require('./cache');
 
-liveStatsManager.GenerateCacheKey = function(matchId) {
-  return "matchid_cache_key_" + matchId.toString();
+liveStatsManager.GenerateCacheKey = function(eventId, streamUrl, gameShortname) {
+  return "matchid_cache_key_" + eventId + "_" + streamUrl + "_" + gameShortname;
 }
 
 // URL for the analyzer to send its information back to.
-liveStatsManager.GenerateAPIReceiverUrl = function(match) {
+liveStatsManager.GenerateAPIReceiverUrl = function() {
   var url = "http://" + config.host + "/livestats";
   return url;
 }
 
 // Generate appropriate path (part of the URL) to send our request to on the analysis server
 // such that the right stream gets run through the right analyzer.
-liveStatsManager.GenerateLiveStatsPathForMatch = function(match) {
-  var path = "/" + match.game + "?config=" + match.config + "&stream=" + match.stream +
-                "&apiHost=" + this.GenerateAPIReceiverUrl(match) + "&apiPort=" + config.port +
-                "&matchId=" + match.matchId.toString();
+liveStatsManager.GenerateLiveStatsPathForMatch = function(eventId, gameShortname, streamUrl, configPath) {
+  var path = "/" + gameShortname + "?config=" + configPath + "&stream=" + streamUrl +
+                "&apiHost=" + this.GenerateAPIReceiverUrl() + "&apiPort=" + config.port;
   if (config.debug) {
     path += "&debug=1";
   }
   return path;
 }
 
-liveStatsManager.RequestLiveStats = function(matchId) {
+liveStatsManager.RequestLiveStats = function(eventId, streamUrl, gameShortname) {
   // Make sure there isn't a duplicate request.
-  var cacheKey = this.GenerateCacheKey(matchId);
+  var cacheKey = this.GenerateCacheKey(eventId, streamUrl, gameShortname);
   if (!this.cache.Lock(cacheKey)) {
     setTimeout(function() {
         this.RequestLiveStats(matchId);
@@ -42,15 +41,13 @@ liveStatsManager.RequestLiveStats = function(matchId) {
     return;
   }
   
-  // MATCH OBJECT:
-  //  - matchId: Match ID.
-  //  - game: Game Name. This should be the game name stored in the database WHICH SHOULD BE EQUIVALENT TO THE GAME NAME RECOGNIZED BY THE ANALYZER.
-  //  - stream: Stream URL that the analysis should grab data from.
+  // EVENT OBJECT:
+  //  - eventId: Event ID.
   //  - config: Where to pull the config file from. This is a remote file or a local file depending on whether or not we are running on production.
-  db.GetMatchDataForLiveStatsQuery(matchId, function(match) {
+  db.GetStreamDataForLiveStatsQuery(eventId, gameShortname, streamUrl, function(event) {
     var liveStatServerHost = config.liveStatsHost;
     var liveStatServerPort = config.liveStatsPort;
-    var liveStatServerPath = this.GenerateLiveStatsPathForMatch(match);
+    var liveStatServerPath = this.GenerateLiveStatsPathForStream(eventId, gameShortname, streamUrl, event.config);
     
     http.get({
       hostname: liveStatServerHost,
@@ -60,6 +57,10 @@ liveStatsManager.RequestLiveStats = function(matchId) {
     }, function(res) {
       
     });
+    
+    // TODO: Check if this needs to be an actual state object
+    this.cache.Put(cacheKey, 1);
+    this.cache.Unlock(cacheKey);
   });
   
 }

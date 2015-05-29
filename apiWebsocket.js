@@ -35,6 +35,25 @@ websocket.prototype.CreateNamespace = function(matchId) {
  return matchId;
 }
 
+/*
+ * TODO: Refactor this code to live separately outside the websocket object...
+ */
+websocket.prototype.GetMatchIdFromIdentifyingData(eventId, gameShortname, data, callback) {
+  if (gameShortname == config.leagueGameShortname) {
+    db.GetLeagueMatchId(eventId, data, function(res) {
+      if (res === null) {
+        console.log("ERROR: Could not find League of Legends match from Data: " + data);
+        callback(null);
+      } else {
+        callback(res.matchId); 
+      }
+    });
+  } else {
+    console.log("Invalid Game Shortname: Game not yet supported by the Live Stats Server -- " + gameShortname);
+    callback(null);
+  }
+}
+
 websocket.prototype.HandleIncomingLiveStatsData = function(data) {
   // First need to make sure the data has maintained its INTEGRITY and then make sure the data comes from an AUTHENTICATED source
   var receivedSignature = data.signature;
@@ -50,22 +69,28 @@ websocket.prototype.HandleIncomingLiveStatsData = function(data) {
     return;
   }
   
-  if (!data.matchId) {
-    console.log("Invalid Message (Match ID): " + JSON.stringify(data));
+  if (!data.eventId || !data.gameShortname) {
+    console.log("Invalid Message (Missing General Identifying Data): " + JSON.stringify(data));
     return;
   }
   
-  var socketNamespace = this.CreateNamespace(data.matchId);
+  this.GetMatchIdFromIdentifyingData(data.eventId, data.gameShortname, data, function(matchId) {
+    if (matchId === null) {
+      return;
+    }
+    
+    var socketNamespace = this.CreateNamespace(matchId);
   
-  var sendData = data;  
-  // Recreate signature such that it's from the API server now.
-  sendData.signature = auth.ServerSignMessageHex(JSON.stringify(sendData));
+    var sendData = data;  
+    // Recreate signature such that it's from the API server now.
+    sendData.signature = auth.ServerSignMessageHex(JSON.stringify(sendData));
   
-  // Store in DB
-  this.db.StoreLiveUpdate(data.matchId, sendData);
+    // Store in DB
+    this.db.StoreLiveUpdate(matchId, sendData);
   
-  // Transmit to Websockets
-  this.io.of(socketNamespace).emit('update', sendData);
+    // Transmit to Websockets
+    this.io.of(socketNamespace).emit('update', sendData);
+  });
 }
 
 

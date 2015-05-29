@@ -6,6 +6,7 @@ config.production = false;
 config.debug = true;
 
 config.leagueGameId = 1;
+config.leagueGameShortname = "league";
 
 config.port = 3000;
 config.host = 'localhost';

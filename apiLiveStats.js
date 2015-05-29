@@ -12,8 +12,10 @@ var livestats = function(app, http, ws, lsMgr) {
   
   // Receive request to start retrieving live stats for a stream.
   app.get('/livestats', function(req, res) {
-    var matchId = req.query.matchId;
-    lsMgr.RequestLiveStats(matchId);
+    var eventId = req.query.eventId;
+    var streamUrl = req.query.streamUrl;
+    var gameShortname = req.query.gameShortname;
+    lsMgr.RequestLiveStats(eventId, streamUrl, gameShortname);
     res.send('');
   });
 };
