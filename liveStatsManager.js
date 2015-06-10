@@ -17,9 +17,10 @@ liveStatsManager.GenerateAPIReceiverUrl = function() {
 
 // Generate appropriate path (part of the URL) to send our request to on the analysis server
 // such that the right stream gets run through the right analyzer.
-liveStatsManager.GenerateLiveStatsPathForMatch = function(eventId, gameShortname, streamUrl, configPath) {
+liveStatsManager.GenerateLiveStatsPathForStream = function(eventId, gameShortname, streamUrl, configPath) {
   var path = "/" + gameShortname + "?config=" + configPath + "&stream=" + streamUrl +
-                "&apiHost=" + this.GenerateAPIReceiverUrl() + "&apiPort=" + config.port;
+                "&apiHost=" + this.GenerateAPIReceiverUrl() + "&apiPort=" + config.port + 
+                "&eventId=" + eventId.toString();
   if (config.debug) {
     path += "&debug=1";
   }
@@ -47,7 +48,7 @@ liveStatsManager.RequestLiveStats = function(eventId, streamUrl, gameShortname) 
   db.GetStreamDataForLiveStatsQuery(eventId, gameShortname, streamUrl, function(event) {
     var liveStatServerHost = config.liveStatsHost;
     var liveStatServerPort = config.liveStatsPort;
-    var liveStatServerPath = this.GenerateLiveStatsPathForStream(eventId, gameShortname, streamUrl, event.config);
+    var liveStatServerPath = liveStatsManager.GenerateLiveStatsPathForStream(eventId, gameShortname, streamUrl, event.config);
     
     http.get({
       hostname: liveStatServerHost,
@@ -59,8 +60,8 @@ liveStatsManager.RequestLiveStats = function(eventId, streamUrl, gameShortname) 
     });
     
     // TODO: Check if this needs to be an actual state object
-    this.cache.Put(cacheKey, 1);
-    this.cache.Unlock(cacheKey);
+    liveStatsManager.cache.Put(cacheKey, 1);
+    liveStatsManager.cache.Unlock(cacheKey);
   });
   
 }

@@ -62,7 +62,7 @@ db.GetLeagueMatchId = function(eventId, data, callback) {
   });
 }
 
-db.GenerateLiveStatsPathForStream = function(eventId, gameShortname, streamUrl, callback) {
+db.GetStreamDataForLiveStatsQuery = function(eventId, gameShortname, streamUrl, callback) {
   var eventQuery = "SELECT events.eventid AS eventId, events.configpath AS config \
         FROM rocketelo.events events \
         WHERE events.eventid = ?";

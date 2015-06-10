@@ -38,7 +38,7 @@ websocket.prototype.CreateNamespace = function(matchId) {
 /*
  * TODO: Refactor this code to live separately outside the websocket object...
  */
-websocket.prototype.GetMatchIdFromIdentifyingData(eventId, gameShortname, data, callback) {
+websocket.prototype.GetMatchIdFromIdentifyingData = function(eventId, gameShortname, data, callback) {
   if (gameShortname == config.leagueGameShortname) {
     db.GetLeagueMatchId(eventId, data, function(res) {
       if (res === null) {

@@ -6,6 +6,8 @@ var livestats = function(app, http, ws, lsMgr) {
   // Receive Live Stats from the Server.
   app.post('/livestats', function(req, res) {
     // Pass it to the websocket API
+    console.log("Request Query: " + req.path + " " + req.originalUrl);
+    console.log(req.body);
     ws.HandleIncomingLiveStatsData(req.body);
     res.send('');
   });

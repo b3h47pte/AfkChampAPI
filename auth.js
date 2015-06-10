@@ -30,10 +30,9 @@ auth.checkAuthBackendMessage = function (data) {
   if (!data.signature || !data.message) {
     return false;
   }
-
-  var hmac = forge.hmac.create();
+  
   var checkSignature = auth.ServerSignMessageHex(data.message);
-  return (checkSignature == data.signature || !config.production);
+  return (checkSignature.toUpperCase() == data.signature.toUpperCase());
 }
 
 module.exports = auth;
