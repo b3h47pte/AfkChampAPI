@@ -41,7 +41,7 @@ websocket.prototype.CreateNamespace = function(matchId) {
  */
 websocket.prototype.GetMatchIdFromIdentifyingData = function(eventId, gameShortname, data, callback) {
   if (gameShortname == config.leagueGameShortname) {
-    db.GetLeagueMatchId(eventId, data, function(res) {
+    this.db.GetLeagueMatchId(eventId, data, function(res) {
       if (res === null) {
         console.log("ERROR: Could not find League of Legends match from Data: " + data);
         callback(null);
