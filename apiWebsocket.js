@@ -1,6 +1,7 @@
 // apiWebsocket.js
 // Handles the Websocket API (mainly used as the method of providing live stats).
 var auth = require('./auth');
+var config = require('./config');
 var websocket = function(app, http, db) {
   this.io = require('socket.io')(http);
   this.db = db;
