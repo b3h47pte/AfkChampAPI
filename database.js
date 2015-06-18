@@ -18,7 +18,7 @@ db.connectionPool = mysql.createPool({
 });
 
 db.GetLeagueMatchId = function(eventId, data, callback) {
-  if(!data || !data.teams || !data.teams.length < 2) {
+  if(!data || !data.teams || data.teams.length != 2) {
     callback(null);
     return;
   }
@@ -38,22 +38,18 @@ db.GetLeagueMatchId = function(eventId, data, callback) {
       console.log("Get League Match Id Error: " + err);
       callback(null);
       return;
-    } 
+    }
     
     var foundTeams = true;
-    for (i = 0; i < 2; ++i) {
-      var found = false;
-      for (res in result) {
-        if (res.team == data.teams[i].name) {
-          found = true;
-          break;
-        }
-      }
-      foundTeams = foundTeams & found;
+    for (var i = 0; i < 2; ++i) {
+      var found = result.some(function(ele, idx) {
+        return (ele.team == data.teams[i].name);
+      });
+      foundTeams = foundTeams && found;
     }
     
     if (!foundTeams) {
-      console.log("Get League Match Id Error: Could not find a match for these teams -- " + data.teams);
+      console.log("Get League Match Id Error: Could not find a match for these teams -- " + JSON.stringify(data.teams));
       callback(null);
       return;
     }
@@ -93,7 +89,7 @@ db.StoreLiveUpdate = function(match, data) {
         INNER JOIN rocketelo.series series ON series.seriesid = matches.parentseriesid \
         INNER JOIN rocketelo.events events ON events.eventid = series.parenteventid \
       WHERE matches.matchid = " + cleanMatchString;
-
+    
     var resultQuery = connection.query(gameQuery, function (err, rows) {
       connection.release();
       
@@ -147,10 +143,10 @@ db.GetTeamIdsForMatch = function(match, data, cachedData, cb) {
     cachedData.teamIds = [];
     cachedData.teamNames = [];
     
-    for(var r in result) {
+    result.forEach(function(r, idx) {
       cachedData.teamIds.push(r.teamid);
       cachedData.teamNames.push(r.teamshorthand);
-    }
+    });
     cb();
   });
 }
@@ -171,10 +167,11 @@ db.GetPlayerIdsForMatch = function(match, data, cachedData, cb) {
 
       cachedData.playerIds.push([]);
       cachedData.playerNames.push([]);
-      for(var r in result) {
+      
+      result.forEach(function(r, idx) {
         cachedData.playerIds[i].push(r.playerid);
         cachedData.playerNames[i].push(r.playername);
-      }
+      });
       cb();
     });
   });
