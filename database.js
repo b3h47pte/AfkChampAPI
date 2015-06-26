@@ -217,7 +217,7 @@ db.StoreLeagueLiveUpdate = function(match, data) {
         data.teams.forEach(function(t, i){
           tasks.push(function(callback) {
             var query = "INSERT INTO league_of_legends.match_stats_team (parentmatchstatid, kills, gold, towers, totalDragons, currentDragons, barons, inhibitors, teamid) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)";
-            db.LaunchQuery(query, [statId, t.kills, t.gold, t.towers, t.totalDragons, t.currentDragons, t.barons, t.inhibitors, cachedData.teamIds[i]], function(err, result) {
+            db.LaunchQuery(query, [statId, t.kills, t.gold, t.towers, t.totalDragons, t.currentDragons, t.barons, t.inhibs, cachedData.teamIds[i]], function(err, result) {
               callback(err, result);
             });
           });
@@ -240,7 +240,7 @@ db.StoreLeagueLiveUpdate = function(match, data) {
           tasks.push(function(callback) {
             async.waterfall([
               function(cb) {
-                var query = "INSERT INTO league_of_legends.match_event (eventtarget, eventtargetsecondary, relevantteam, killtype, timestamp, parentmatchid) VALUES (?, ?, ?, ?, ?, ?, ?)";
+                var query = "INSERT INTO league_of_legends.match_event (eventtarget, eventtargetsecondary, relevantteam, killtype, timestamp, parentmatchid) VALUES (?, ?, ?, ?, ?, ?)";
                 db.LaunchQuery(query, [e.target, e.secondarytarget, cachedData.teamIds[e.team], e.killtype, data.global.time, parseInt(match)], function(err, result) {
                   cb(err, result);
                 }); 
