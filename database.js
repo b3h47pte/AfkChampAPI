@@ -241,7 +241,7 @@ db.StoreLeagueLiveUpdate = function(match, data) {
             async.waterfall([
               function(cb) {
                 var query = "INSERT INTO league_of_legends.match_event (eventtarget, eventtargetsecondary, relevantteam, killtype, timestamp, parentmatchid) VALUES (?, ?, ?, ?, ?, ?)";
-                db.LaunchQuery(query, [e.target, e.secondarytarget, cachedData.teamIds[e.team], e.killtype, data.global.time, parseInt(match)], function(err, result) {
+                db.LaunchQuery(query, [e.type, e.info, cachedData.teamIds[e.team], e.killtype, data.global.time, parseInt(match)], function(err, result) {
                   cb(err, result);
                 }); 
               },
