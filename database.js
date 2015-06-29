@@ -289,7 +289,7 @@ db.StoreLeagueLiveUpdate = function(match, data) {
   }
   
   function StoreSetupUpdate() {
-    if(cachedData.savedSetup) {
+    if(cachedData.savedSetup || !cachedData.teamsetup || !cachedData.playsetup) {
       return;
     }
     cachedData.savedSetup = true;
