@@ -289,7 +289,7 @@ db.StoreLeagueLiveUpdate = function(match, data) {
   }
   
   function StoreSetupUpdate() {
-    if(!cachedData.savedSetup) {
+    if(cachedData.savedSetup) {
       return;
     }
     cachedData.savedSetup = true;
@@ -320,6 +320,7 @@ db.StoreLeagueLiveUpdate = function(match, data) {
   }
   
   function CacheSetupUpdate() {
+    cachedData.savedSetup = false;
     // ONLY STORE THIS DATA IN THE CACHE UNTIL WE'RE READY TO DUMP IT INTO THE DATABASE
     // Team Setup (Team Bans)
     cachedData.teamsetup = [];
