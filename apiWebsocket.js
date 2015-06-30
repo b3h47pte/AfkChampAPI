@@ -2,8 +2,8 @@
 // Handles the Websocket API (mainly used as the method of providing live stats).
 var auth = require('./auth');
 var config = require('./config');
-var websocket = function(app, http, db) {
-  this.io = require('socket.io')(http);
+var websocket = function(app, http, db, server) {
+  this.io = require('socket.io').listen(server);
   this.db = db;
 
   function HandleLiveStatsSocket(socket) {

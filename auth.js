@@ -6,10 +6,10 @@ var pconfig = require('./private/privateConfig');
 var forge = require('node-forge');
 var auth = {}
 auth.GetAuthLevel = function(data) {
-  if (checkAuthBackendMessage(data)) {
-    return AuthLevelEnum.BACKEND; 
+  if (auth.checkAuthBackendMessage(data)) {
+    return auth.AuthLevelEnum.BACKEND; 
   }
-  return AuthLevelEnum.CLIENT;
+  return auth.AuthLevelEnum.CLIENT;
 };
 
 auth.AuthLevelEnum = Object.freeze({
