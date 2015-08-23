@@ -46,7 +46,7 @@ websocket.prototype.GetMatchIdFromIdentifyingData = function(eventId, gameShortn
         console.log("ERROR: Could not find League of Legends match from Data: " + data);
         callback(null);
       } else {
-        callback(res); 
+        callback(res);
       }
     });
   } else {
@@ -83,7 +83,10 @@ websocket.prototype.HandleIncomingLiveStatsData = function(data) {
     
     var socketNamespace = sws.CreateNamespace(matchId);
   
-    var sendData = data;  
+    var sendData = data;
+      
+    // Add extra data that the live stats can't detect (i.e. player names)
+      
     // Recreate signature such that it's from the API server now.
     sendData.signature = auth.ServerSignMessageHex(JSON.stringify(sendData));
   
@@ -91,7 +94,7 @@ websocket.prototype.HandleIncomingLiveStatsData = function(data) {
     sws.db.StoreLiveUpdate(matchId, sendData);
   
     // Transmit to Websockets
-    sws.io.of(socketNamespace).emit('update', sendData);
+    sws.io.emit('liveupdate', sendData);
   });
 }
 
