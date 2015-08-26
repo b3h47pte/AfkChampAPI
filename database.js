@@ -17,6 +17,37 @@ db.connectionPool = mysql.createPool({
   database: pconfig.db.mainDatabase
 });
 
+db.GetPlayerName = function(matchId, team, playerIdx, callback) {
+    var playerQuery = "SELECT player.playername AS playername\
+        FROM rocketelo.players player \
+            INNER JOIN rocketelo.match_player match_player ON match_player.playerid = player.playerid \
+            INNER JOIN rocketelo.matches matches ON matches.matchid = match_player.matchid \
+            INNER JOIN rocketelo.teams teams ON teams.teamid = player.parentteamid \
+        WHERE teams.teamshorthand = ? AND matches.matchid = ? AND player.currentrole = ?";
+    db.LaunchQuery(playerQuery, [team.name, matchId, playerIdx], function(err, result) {
+        if (err || result.length == 0) {
+            console.log("Get Player Name Error: " + err);
+            callback("Unknown");
+            return;
+        }
+        callback(result[0].playername);
+    });
+}
+
+db.GetFullTeamName = function(team, callback) {
+    var teamQuery = "SELECT team.teamname AS teamname \
+        FROM rocketelo.teams team \
+        WHERE team.teamshorthand = ?";
+    db.LaunchQuery(teamQuery, [team.name], function(err, result){ 
+        if (err) {
+            console.log("Get Full Team Name Error: " + err);
+            callback(team.name);
+            return;
+        }
+        callback(result[0].teamname);
+    });
+}
+
 db.GetLeagueMatchId = function(eventId, data, callback) {
   if(!data || !data.teams || data.teams.length != 2) {
     callback(null);
@@ -129,221 +160,220 @@ db.LaunchQuery = function(query, params, callback) {
 }
 
 db.GetTeamIdsForMatch = function(match, data, cachedData, cb) {
-  // Find the teams assigned to this match and get their shortnames and match it up to the teams given in data.
-  var teamsQuery = "SELECT teams.teamid, teams.teamshorthand \
-    FROM rocketelo.match_team match_team \
-      INNER JOIN rocketelo.teams teams ON teams.teamid = match_team.teamid \
-    WHERE match_team.matchid = " + match;
-  db.LaunchQuery(teamsQuery, [], function(err, result) {
-    if (err) {
-      console.log("GET TEAM IDS ERROR: " + err);
-      return;
-    }
-    
-    cachedData.teamIds = [];
-    cachedData.teamNames = [];
-    
-    result.forEach(function(r, idx) {
-      cachedData.teamIds.push(r.teamid);
-      cachedData.teamNames.push(r.teamshorthand);
+    // Find the teams assigned to this match and get their shortnames and match it up to the teams given in data.
+    var teamsQuery = "SELECT teams.teamid, teams.teamshorthand \
+        FROM rocketelo.match_team match_team \
+            INNER JOIN rocketelo.teams teams ON teams.teamid = match_team.teamid \
+        WHERE match_team.matchid = " + match;
+    db.LaunchQuery(teamsQuery, [], function(err, result) {
+        if (err) {
+            console.log("GET TEAM IDS ERROR: " + err);
+            return;
+        }
+
+        cachedData.teamIds = [];
+        cachedData.teamNames = [];
+
+        result.forEach(function(r, idx) {
+            cachedData.teamIds.push(r.teamid);
+            cachedData.teamNames.push(r.teamshorthand);
+        });
+        cb();
     });
-    cb();
-  });
 }
 
 db.GetPlayerIdsForMatch = function(match, data, cachedData, cb) {
-  cachedData.playerIds = [];
-  cachedData.playerNames = [];
-  cachedData.teamIds.forEach(function(t, i) {
-    var playersQuery = "SELECT players.playerid, players.playername \
-      FROM rocketelo.match_player match_player \
-        INNER JOIN rocketelo.players players ON players.playerid = match_player.playerid \
-      WHERE match_player.matchid = " + match + " AND players.parentteamid = " + t.toString();
-    db.LaunchQuery(playersQuery, [], function(err, result) {
-      if (err) {
-        console.log("GET PLAYER IDS ERROR: " + err);
-        return;
-      }
+    cachedData.playerIds = [];
+    cachedData.playerNames = [];
+    cachedData.teamIds.forEach(function(t, i) {
+        var playersQuery = "SELECT players.playerid, players.playername \
+            FROM rocketelo.match_player match_player \
+                INNER JOIN rocketelo.players players ON players.playerid = match_player.playerid \
+            WHERE match_player.matchid = " + match + " AND players.parentteamid = " + t.toString();
+        db.LaunchQuery(playersQuery, [], function(err, result) {
+            if (err) {
+                console.log("GET PLAYER IDS ERROR: " + err);
+                return;
+            }
+            cachedData.playerIds.push([]);
+            cachedData.playerNames.push([]);
 
-      cachedData.playerIds.push([]);
-      cachedData.playerNames.push([]);
-      
-      result.forEach(function(r, idx) {
-        cachedData.playerIds[i].push(r.playerid);
-        cachedData.playerNames[i].push(r.playername);
-      });
-      cb();
+            result.forEach(function(r, idx) {
+                cachedData.playerIds[i].push(r.playerid);
+                cachedData.playerNames[i].push(r.playername);
+            });
+            cb();
+        });
     });
-  });
 }
 
-db.StoreLeagueLiveUpdate = function(match, data) {
-  var cachedData = db.cache.Access(match);
-  if (!cachedData) {
-    var recache = db.cache.Lock(match);
-    if (!recache) {
-      setTimeout(function() {
-        db.StoreLeagueLiveUpdate(match, data);
-      }, 200);
-      return;
-    }
-    
-    cachedData = {};
-    
-    // Get Team ID's, Player ID's for the match
-    // This information is fixed for now -- but this should eventually be adaptable based on the live stats information (AKA GET PLAYER NAMES)
-    db.GetTeamIdsForMatch(match, data, cachedData, function() {
-      db.GetPlayerIdsForMatch(match, data, cachedData, function(){
-        db.cache.Put(match, cachedData);
-        db.cache.Unlock();
-        HandleUpdate();
-      });
-    });
-  } else {
-    HandleUpdate();
-  }
-  
-  function StoreStatUpdate() {
-    // Create new match stat row
-    var query = "INSERT INTO league_of_legends.match_stats (timestamp, parentmatchid, timetobaron, timetodragon) VALUES (?, ?, ?, ?)";
-    db.LaunchQuery(query, [data.global.time, parseInt(match), data.global.timeToDragon, data.global.timeToBaron], function(err, result) {
-      if (err) {
-        console.log("INSERT INTO MATCH STATS ERROR: " + err);
-        return;
-      }
-      var statId = result.insertId;
-      var tasks = [];
-      if (data.teams && data.teams.length > 0) {
-        data.teams.forEach(function(t, i){
-          tasks.push(function(callback) {
-            var query = "INSERT INTO league_of_legends.match_stats_team (parentmatchstatid, kills, gold, towers, totalDragons, currentDragons, barons, inhibitors, teamid) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)";
-            db.LaunchQuery(query, [statId, t.kills, t.gold, t.towers, t.totalDragons, t.currentDragons, t.barons, t.inhibs, cachedData.teamIds[i]], function(err, result) {
-              callback(err, result);
-            });
-          });
-          
-          if (t.players && t.players.length > 0) {
-            t.players.forEach(function(p, j) {
-              tasks.push(function(callback) {
-                var query = "INSERT INTO league_of_legends.match_stats_player (parentmatchstatid, kills, deaths, assists, creeps, towers, inhibitors, barons, dragons, playerid) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
-                db.LaunchQuery(query, [statId, p.kills, p.deaths, p.assists, p.creeps, p.towers, p.inhibs, p.barons, p.dragons, cachedData.playerIds[i][j]], function(err, result) {
-                  callback(err, result);
-                });
-              }); 
-            });
-          }  
-        });
-      }
-      
-      if (data.events && data.events.length > 0) {
-        data.events.forEach(function(e, i) {
-          tasks.push(function(callback) {
-            async.waterfall([
-              function(cb) {
-                var query = "INSERT INTO league_of_legends.match_event (eventtarget, eventtargetsecondary, relevantteam, killtype, timestamp, parentmatchid) VALUES (?, ?, ?, ?, ?, ?)";
-                db.LaunchQuery(query, [e.type, e.info, cachedData.teamIds[e.team], e.killtype, data.global.time, parseInt(match)], function(err, result) {
-                  cb(err, result);
-                }); 
-              },
-              // Main Player
-              function(inRes, cb) {
-                async.parallel([
-                  function(inRes, cb) {
-                    var query = "INSERT INTO league_of_legends.match_event_player (matcheventid, playerid, ismainplayer) VALUES (?, ?, ?)";
-                    db.LaunchQuery(query, [inRes.insertId, cachedData.playerIds[e.team][e.mainPlayer], 1], function(err, result) {
-                      cb(err, result);
-                    }); 
-                  },
-                  // Supporting Players
-                  function(inRes, cb) {
-                    var sp_tasks = [];
-                    e.supportingPlayers.forEach(function(sp, j) {
-                      sp_tasks.push(function(icb) {
-                        var query = "INSERT INTO league_of_legends.match_event_player (matcheventid, playerid, ismainplayer) VALUES (?, ?, ?)";
-                        db.LaunchQuery(query, [inRes.insertId, cachedData.playerIds[(e.team+1)%2][sp], 0], function(err, result) {
-                          icb(err, result);
-                        }); 
-                      });
-                    });
-                    async.parallel(sp_tasks, function(err, results) {
-                      cb(results);
-                    });
-                  }
-                ], function (err, results) {
-                  cb(err, results.concat([inRes]));
-                });
-              }
-            ], function(err, results) {
-              callback(err, results);
-            });
-          });  
-        });
-      }
-      
-      async.parallel(tasks, function(err, results) {
-        if (err) {
-          console.log("STORE STATE UPDATE ERROR: " + err); 
+db.StoreLeagueLiveUpdate = function(match, data, callback) {
+    var cachedData = db.cache.Access(match);
+    if (!cachedData) {
+        var recache = db.cache.Lock(match);
+        if (!recache) {
+            setTimeout(function() {
+                db.StoreLeagueLiveUpdate(match, data);
+            }, 200);
+            return;
         }
-      });
-    });
-  }
-  
-  function StoreSetupUpdate() {
-    if(cachedData.savedSetup || !cachedData.teamsetup || !cachedData.playsetup) {
-      return;
-    }
-    cachedData.savedSetup = true;
-    
-    // Save team setups
-    for (i = 0; i < 2; ++i) {
-      for (j = 0; j < 3; ++j) {
-        var query = "INSERT INTO league_of_legends.match_team_setup (teamid, banned_champion, parentmatchid) VALUES (?, ?, ?)";
-        db.LaunchQuery(query, [cachedData.teamIds[i], cachedData.teamsetup[i][j], parseInt(match)], function(err, result) {
-          if (err) {
-            console.log("SAVE TEAM SETUP ERROR: " + err);
-          }
+        
+        cachedData = {};
+        
+        // Get Team ID's, Player ID's for the match
+        // This information is fixed for now -- but this should eventually be adaptable based on the live stats information (AKA GET PLAYER NAMES)
+        db.GetTeamIdsForMatch(match, data, cachedData, function() {
+            db.GetPlayerIdsForMatch(match, data, cachedData, function(){
+                db.cache.Put(match, cachedData);
+                db.cache.Unlock();
+                HandleUpdate();
+            });
         });
-      }
+    } else {
+        HandleUpdate();
     }
     
-    // Save player setups
-    for (i = 0; i < 2; ++i) {
-      for (j = 0; j < 5; ++j) {
-        var query = "INSERT INTO league_of_legends.match_player_setup (playerid, champion, parentmatchid) VALUES (?, ?, ?)";
-        db.LaunchQuery(query, [cachedData.playerIds[i][j], cachedData.playersetup[i][j], parseInt(match)], function(err, result) {
-          if (err) {
-            console.log("SAVE PLAYER SETUP ERROR: " + err);
-          }
+    function StoreStatUpdate() {
+        // Create new match stat row
+        var query = "INSERT INTO league_of_legends.match_stats (timestamp, parentmatchid, timetobaron, timetodragon) VALUES (?, ?, ?, ?)";
+        db.LaunchQuery(query, [data.global.time, parseInt(match), data.global.timeToDragon, data.global.timeToBaron], function(err, result) {
+            if (err) {
+                console.log("INSERT INTO MATCH STATS ERROR: " + err);
+                return;
+            }
+            var statId = result.insertId;
+            var tasks = [];
+            if (data.teams && data.teams.length > 0) {
+                data.teams.forEach(function(t, i){
+                    tasks.push(function(callback) {
+                        var query = "INSERT INTO league_of_legends.match_stats_team (parentmatchstatid, kills, gold, towers, totalDragons, currentDragons, barons, inhibitors, teamid) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)";
+                        db.LaunchQuery(query, [statId, t.kills, t.gold, t.towers, t.totalDragons, t.currentDragons, t.barons, t.inhibs, cachedData.teamIds[i]], function(err, result) {
+                            callback(err, result);
+                        });
+                    });
+                    
+                    if (t.players && t.players.length > 0) {
+                        t.players.forEach(function(p, j) {
+                            tasks.push(function(callback) {
+                                var query = "INSERT INTO league_of_legends.match_stats_player (parentmatchstatid, kills, deaths, assists, creeps, towers, inhibitors, barons, dragons, playerid) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+                                db.LaunchQuery(query, [statId, p.kills, p.deaths, p.assists, p.creeps, p.towers, p.inhibs, p.barons, p.dragons, cachedData.playerIds[i][j]], function(err, result) {
+                                    callback(err, result);
+                                });
+                            }); 
+                        });
+                    }    
+                });
+            }
+            
+            if (data.events && data.events.length > 0) {
+                data.events.forEach(function(e, i) {
+                    tasks.push(function(callback) {
+                        async.waterfall([
+                            function(cb) {
+                                var query = "INSERT INTO league_of_legends.match_event (eventtarget, eventtargetsecondary, relevantteam, killtype, timestamp, parentmatchid) VALUES (?, ?, ?, ?, ?, ?)";
+                                db.LaunchQuery(query, [e.type, e.info, cachedData.teamIds[e.team], e.killtype, data.global.time, parseInt(match)], function(err, result) {
+                                    cb(err, result);
+                                }); 
+                            },
+                            // Main Player
+                            function(inRes, cb) {
+                                async.parallel([
+                                    function(inRes, cb) {
+                                        var query = "INSERT INTO league_of_legends.match_event_player (matcheventid, playerid, ismainplayer) VALUES (?, ?, ?)";
+                                        db.LaunchQuery(query, [inRes.insertId, cachedData.playerIds[e.team][e.mainPlayer], 1], function(err, result) {
+                                            cb(err, result);
+                                        }); 
+                                    },
+                                    // Supporting Players
+                                    function(inRes, cb) {
+                                        var sp_tasks = [];
+                                        e.supportingPlayers.forEach(function(sp, j) {
+                                            sp_tasks.push(function(icb) {
+                                                var query = "INSERT INTO league_of_legends.match_event_player (matcheventid, playerid, ismainplayer) VALUES (?, ?, ?)";
+                                                db.LaunchQuery(query, [inRes.insertId, cachedData.playerIds[(e.team+1)%2][sp], 0], function(err, result) {
+                                                    icb(err, result);
+                                                }); 
+                                            });
+                                        });
+                                        async.parallel(sp_tasks, function(err, results) {
+                                            cb(results);
+                                        });
+                                    }
+                                ], function (err, results) {
+                                    cb(err, results.concat([inRes]));
+                                });
+                            }
+                        ], function(err, results) {
+                            callback(err, results);
+                        });
+                    });    
+                });
+            }
+            
+            async.parallel(tasks, function(err, results) {
+                if (err) {
+                    console.log("STORE STATE UPDATE ERROR: " + err); 
+                }
+            });
         });
-      }
     }
-  }
-  
-  function CacheSetupUpdate() {
-    cachedData.savedSetup = false;
-    // ONLY STORE THIS DATA IN THE CACHE UNTIL WE'RE READY TO DUMP IT INTO THE DATABASE
-    // Team Setup (Team Bans)
-    cachedData.teamsetup = [];
-    cachedData.teamsetup.push(data.bans[0].slice(0));
-    cachedData.teamsetup.push(data.bans[1].slice(0));
+    
+    function StoreSetupUpdate() {
+        if(cachedData.savedSetup || !cachedData.teamsetup || !cachedData.playsetup) {
+            return;
+        }
+        cachedData.savedSetup = true;
+        
+        // Save team setups
+        for (i = 0; i < 2; ++i) {
+            for (j = 0; j < 3; ++j) {
+                var query = "INSERT INTO league_of_legends.match_team_setup (teamid, banned_champion, parentmatchid) VALUES (?, ?, ?)";
+                db.LaunchQuery(query, [cachedData.teamIds[i], cachedData.teamsetup[i][j], parseInt(match)], function(err, result) {
+                    if (err) {
+                        console.log("SAVE TEAM SETUP ERROR: " + err);
+                    }
+                });
+            }
+        }
+        
+        // Save player setups
+        for (i = 0; i < 2; ++i) {
+            for (j = 0; j < 5; ++j) {
+                var query = "INSERT INTO league_of_legends.match_player_setup (playerid, champion, parentmatchid) VALUES (?, ?, ?)";
+                db.LaunchQuery(query, [cachedData.playerIds[i][j], cachedData.playersetup[i][j], parseInt(match)], function(err, result) {
+                    if (err) {
+                        console.log("SAVE PLAYER SETUP ERROR: " + err);
+                    }
+                });
+            }
+        }
+    }
+    
+    function CacheSetupUpdate() {
+        cachedData.savedSetup = false;
+        // ONLY STORE THIS DATA IN THE CACHE UNTIL WE'RE READY TO DUMP IT INTO THE DATABASE
+        // Team Setup (Team Bans)
+        cachedData.teamsetup = [];
+        cachedData.teamsetup.push(data.bans[0].slice(0));
+        cachedData.teamsetup.push(data.bans[1].slice(0));
 
-    // Player Setup (Champion Pick)
-    cachedData.playersetup = [];
-    cachedData.playersetup.push(data.picks[0].slice(0));
-    cachedData.playersetup.push(data.picks[1].slice(0));
-  }
-  
-  function HandleUpdate() {
-    // See LEAGUE_UPDATE.format as to how 'data' will have its information stored.
-    if (data.mode == 0) {
-      if (!cachedData.savedSetup) {
-        StoreSetupUpdate();
-      }
-      StoreStatUpdate(); 
-    } else if (data.mode == 1) {
-      CacheSetupUpdate();
+        // Player Setup (Champion Pick)
+        cachedData.playersetup = [];
+        cachedData.playersetup.push(data.picks[0].slice(0));
+        cachedData.playersetup.push(data.picks[1].slice(0));
     }
-  }
+    
+    function HandleUpdate() {
+        // See LEAGUE_UPDATE.format as to how 'data' will have its information stored.
+        if (data.mode == 0) {
+            if (!cachedData.savedSetup) {
+                StoreSetupUpdate();
+            }
+            StoreStatUpdate(); 
+        } else if (data.mode == 1) {
+            CacheSetupUpdate();
+        }
+    }
 }
 
 module.exports = db

@@ -1,6 +1,7 @@
 LEAGUE LIVE UPDATE FORMAT v0.1 (JSON)
 - 1) All times are in seconds unless otherwise noted
 - 2) Note that the live stats analysis program is blind to who the team is/who the player is. That information should be filled in elsewhere.
+- 3) Any items followed by a star (*) indicates that this value is sent to clients but is not part of the original data sent by the analyzer server.
 
 Live Update Data Type:
 {
@@ -18,6 +19,7 @@ Live Update Data Type:
 Team Data Type (t*):
 {
   "name": (string),
+  "fullName": (string)*,
   "players": [p1, ..., p5],
   "kills": (int),
   "gold": (int),

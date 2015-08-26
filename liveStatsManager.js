@@ -28,42 +28,42 @@ liveStatsManager.GenerateLiveStatsPathForStream = function(eventId, gameShortnam
 }
 
 liveStatsManager.RequestLiveStats = function(eventId, streamUrl, gameShortname) {
-  // Make sure there isn't a duplicate request.
-  var cacheKey = this.GenerateCacheKey(eventId, streamUrl, gameShortname);
-  if (!this.cache.Lock(cacheKey)) {
-    setTimeout(function() {
-        this.RequestLiveStats(matchId);
-      }, 200);
-    return;
-  }
-  
-  // A Live Stats server has already been tasked to process this stream
-  if (this.cache.Access(cacheKey)) {
-    return;
-  }
-  
-  // EVENT OBJECT:
-  //  - eventId: Event ID.
-  //  - config: Where to pull the config file from. This is a remote file or a local file depending on whether or not we are running on production.
-  db.GetStreamDataForLiveStatsQuery(eventId, gameShortname, streamUrl, function(event) {
-    var liveStatServerHost = config.liveStatsHost;
-    var liveStatServerPort = config.liveStatsPort;
-    var liveStatServerPath = liveStatsManager.GenerateLiveStatsPathForStream(eventId, gameShortname, streamUrl, event.config);
-    
-    http.get({
-      hostname: liveStatServerHost,
-      port: liveStatServerPort,
-      path: liveStatServerPath,
-      agent: false
-    }, function(res) {
-      
+    // Make sure there isn't a duplicate request.
+    var cacheKey = this.GenerateCacheKey(eventId, streamUrl, gameShortname);
+    if (!this.cache.Lock(cacheKey)) {
+        setTimeout(function() {
+            this.RequestLiveStats(matchId);
+        }, 200);
+        return;
+    }
+
+    // A Live Stats server has already been tasked to process this stream
+    if (this.cache.Access(cacheKey)) {
+        return;
+    }
+
+    // EVENT OBJECT:
+    //  - eventId: Event ID.
+    //  - config: Where to pull the config file from. This is a remote file or a local file depending on whether or not we are running on production.
+    db.GetStreamDataForLiveStatsQuery(eventId, gameShortname, streamUrl, function(event) {
+        var liveStatServerHost = config.liveStatsHost;
+        var liveStatServerPort = config.liveStatsPort;
+        var liveStatServerPath = liveStatsManager.GenerateLiveStatsPathForStream(eventId, gameShortname, streamUrl, event.config);
+
+        http.get({
+            hostname: liveStatServerHost,
+            port: liveStatServerPort,
+            path: liveStatServerPath,
+            agent: false
+        }, function(res) {
+
+        });
+
+        // TODO: Check if this needs to be an actual state object
+        liveStatsManager.cache.Put(cacheKey, 1);
+        liveStatsManager.cache.Unlock(cacheKey);
     });
-    
-    // TODO: Check if this needs to be an actual state object
-    liveStatsManager.cache.Put(cacheKey, 1);
-    liveStatsManager.cache.Unlock(cacheKey);
-  });
-  
+
 }
 
 module.exports = liveStatsManager;
